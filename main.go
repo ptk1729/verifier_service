@@ -141,6 +141,11 @@ func main() {
         fmt.Println("Usage: go run main.go <repo_url>")
         os.Exit(1)
     }
+    //  add an optional flag to print the report to the console
+    printReport := false
+    if len(os.Args) > 2 && os.Args[2] == "--print-report" {
+        printReport = true
+    }
     repoURL := os.Args[1]       
 	// repoURL := "https://github.com/ptk1729/go_proj"
 	projectName := "go_proj"
@@ -270,7 +275,12 @@ func main() {
 	// -------- SAVE --------
 	reportName := fmt.Sprintf("/tmp/report_%s.json", time.Now().Format("20060102150405"))
 	saveJSON(report, reportName)
+
 	fmt.Printf("Done. Report saved to %s\n", reportName)
+    if printReport {
+        reportJSON, _ := json.MarshalIndent(report, "", "  ")
+        fmt.Println(string(reportJSON))
+    }
 }
 
 func run(name string, args ...string) string {
@@ -394,14 +404,14 @@ func runOsvScanner(path string) (ResultStatus, string, []OsvFinding) {
 						}
 					}
 				}
-vulnerabilities = append(vulnerabilities, OsvFinding{
-    ID:           vuln.ID,
-    Package:      pkg.Package.Name,
-    Ecosystem:    pkg.Package.Ecosystem,
-    Summary:      vuln.Summary,
-    Details:      vuln.Details,
-    FixedVersion: fixedVersion,
-})
+        vulnerabilities = append(vulnerabilities, OsvFinding{
+            ID:           vuln.ID,
+            Package:      pkg.Package.Name,
+            Ecosystem:    pkg.Package.Ecosystem,
+            Summary:      vuln.Summary,
+            Details:      vuln.Details,
+            FixedVersion: fixedVersion,
+        })
 			}
 		}
 	}
@@ -423,7 +433,6 @@ func enrichVulnerabilitiesWithSeverity(vulns []OsvFinding) []OsvFinding {
 
 		// Use the actual vulnerability ID from the scanner results
 		url := fmt.Sprintf("https://api.osv.dev/v1/vulns/%s", v.ID)
-		// fmt.Printf("Querying OSV API for %s\n", v.ID)
 
 		resp, err := http.Get(url)
 		if err != nil {
@@ -450,22 +459,21 @@ func enrichVulnerabilitiesWithSeverity(vulns []OsvFinding) []OsvFinding {
 			continue
 		}
 
-		// 1. Extract the human-readable score (e.g., "HIGH")
+		// Extract the human-readable score (e.g., "HIGH")
 		humanReadableScore := apiVuln.DatabaseSpecific.Severity
-        // get type and vector score from severity.type and severity.score  
         
         
 
-		// 2. Extract the CVSS vector string (e.g., "CVSS:4.0/...")
+		// Extract the CVSS vector string (e.g., "CVSS:4.0/...")
 		var CVSS_vector string
 		var CVSS_type string
 		if len(apiVuln.Severity) > 0 {
-			// Just grab the first one available.
+			//  for now just grab the first one available.
+            // TODO: revisit to check if this is the correct way to get the severity type and vector
             CVSS_type = apiVuln.Severity[0].Type
 			CVSS_vector = apiVuln.Severity[0].Score
 		}
 
-		// 3. Populate the new SeverityObject in our results
 		if humanReadableScore != "" || CVSS_vector != "" {
 			fmt.Printf("Found Severity for %s: Score=%s, Vector=%s\n", v.ID, humanReadableScore, CVSS_vector)
 			enrichedVulns[i].SeverityObject = SeverityObject{
