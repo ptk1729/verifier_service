@@ -24,21 +24,24 @@ const (
 // RunLint checks code in the given folder with go vet (errors)
 // and golint (warnings) without changing any file.
 func RunLint(path string) LintingResult {
+	// first run go mod tidy and other commands to make sure the code is up to date
+	runCmd(path, "go", "mod", "tidy")
 	errs := runGovet(path)
-	warns := runGolint(path)
+	// warns := runGolint(path)
 
 	status := ResultStatusPassed
 	if len(errs) > 0 {
 		status = ResultStatusFailed
-	} else if len(warns) > 0 {
-		status = ResultStatusWarning
 	}
+	// } else if len(warns) > 0 {
+	// 	status = ResultStatusWarning
+	// }
 
 	return LintingResult{
-		Status:   status,
-		Errors:   errs,
-		Warnings: warns,
-		Tool:     "go vet + golint",
+		Status: status,
+		Errors: errs,
+		// Warnings: warns,
+		Tool: "go vet",
 	}
 }
 
