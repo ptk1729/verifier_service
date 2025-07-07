@@ -102,7 +102,8 @@ func main() {
 func runIndividualCheck(clonePath string, lint, format, vuln, env, reviewsFlag, custom, commitFlag bool, requiredReviews int, allowedKeys []string) {
 	if lint {
 		fmt.Println("=== LINTING CHECK ===")
-		result := linting.RunGolint(clonePath)
+		result := linting.RunLint(clonePath)
+		fmt.Println(result)
 		output, _ := json.MarshalIndent(result, "", "  ")
 		fmt.Println(string(output))
 	}

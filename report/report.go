@@ -39,7 +39,7 @@ func GenerateReport(
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	// Run all checks
-	lintingResult := linting.RunGolint(clonePath)
+	lintingResult := linting.RunLint(clonePath)
 	formattingResult := formatting.RunGofmt(clonePath)
 	vulnStatus, vulnTool, vulnerabilities := vulnscan.RunOsvScanner(clonePath)
 

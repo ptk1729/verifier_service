@@ -1,7 +1,6 @@
 package linting
 
 import (
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -22,47 +21,60 @@ const (
 	ResultStatusPassed  ResultStatus = "PASSED"
 )
 
-// RunGolint runs golint on all Go files in the given path and returns linting results
-func RunGolint(path string) LintingResult {
-	warnings, errors := runGolint(path)
+// RunLint checks code in the given folder with go vet (errors)
+// and golint (warnings) without changing any file.
+func RunLint(path string) LintingResult {
+	errs := runGovet(path)
+	warns := runGolint(path)
 
 	status := ResultStatusPassed
-	if len(errors) > 0 {
+	if len(errs) > 0 {
 		status = ResultStatusFailed
-	} else if len(warnings) > 0 {
+	} else if len(warns) > 0 {
 		status = ResultStatusWarning
 	}
 
 	return LintingResult{
 		Status:   status,
-		Errors:   errors,
-		Warnings: warnings,
-		Tool:     "golint",
+		Errors:   errs,
+		Warnings: warns,
+		Tool:     "go vet + golint",
 	}
 }
 
-func runGolint(path string) (warnings, errors []string) {
-	files := []string{}
-	filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
-		if strings.HasSuffix(p, ".go") {
-			files = append(files, p)
-		}
-		return nil
-	})
+// ----------------------- helpers -----------------------
 
-	for _, f := range files {
-		out := run("golint", f)
-		if strings.Contains(out, "warning") {
-			warnings = append(warnings, strings.TrimSpace(out))
-		} else if out != "" {
-			warnings = append(warnings, strings.TrimSpace(out))
-		}
-	}
-	return
+func runGovet(dir string) []string {
+	out, _ := runCmd(dir, "go", "vet", "./...")
+	return split(out)
 }
 
-func run(name string, args ...string) string {
+func runGolint(dir string) []string {
+	out, _ := runCmd(dir, "golint", "./...")
+	return split(out)
+}
+
+func runCmd(dir, name string, args ...string) (string, error) {
 	cmd := exec.Command(name, args...)
-	out, _ := cmd.CombinedOutput()
-	return string(out)
+	cmd.Dir = dir // run inside the target folder
+	out, err := cmd.CombinedOutput()
+	if err != nil && len(out) == 0 { // command failed but printed nothing
+		return err.Error(), err
+	}
+	return string(out), err
+}
+
+func split(s string) []string {
+	var lines []string
+	for _, l := range strings.Split(strings.TrimSpace(s), "\n") {
+		l = strings.TrimSpace(l)
+		if l != "" {
+			// keep only the base file name for shorter output
+			if idx := strings.Index(l, ":"); idx > 0 {
+				l = filepath.Base(l[:idx]) + l[idx:]
+			}
+			lines = append(lines, l)
+		}
+	}
+	return lines
 }
