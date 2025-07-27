@@ -14,8 +14,10 @@ import (
 	"github.com/slsa-framework/slsa-verifier/v2/verifiers"
 )
 
+// ResultStatus represents the outcome of an SLSA verification check
 type ResultStatus string
 
+// ResultStatus constants define the possible outcomes of SLSA verification checks
 const (
 	ResultStatusPassed  ResultStatus = "PASSED"
 	ResultStatusFailed  ResultStatus = "FAILED"
@@ -23,16 +25,19 @@ const (
 	ResultStatusWarning ResultStatus = "WARNING"
 )
 
+// Material represents a software component in the provenance
 type Material struct {
 	URI    string `json:"uri"`
 	Digest string `json:"digest"`
 }
 
+// RequirementCheck represents the status of a specific SLSA requirement
 type RequirementCheck struct {
 	Name   string       `json:"name"`
 	Status ResultStatus `json:"status"`
 }
 
+// SlsaCheckResult contains the results of an SLSA verification check
 type SlsaCheckResult struct {
 	Status            ResultStatus       `json:"status"`
 	BinaryPath        string             `json:"binary_path"`
@@ -54,7 +59,7 @@ func RunSlsaCheck(ctx context.Context, binaryPath, provenancePath, sourceURI str
 
 	if binaryPath == "" || provenancePath == "" || sourceURI == "" {
 		res.Status = ResultStatusSkipped
-		res.ErrorMessage = "skipping slsa verification as binaryPath, provenancePath, or sourceURI is empty"
+		res.ErrorMessage = "skipping slsa verification as binary-path, provenance-path, or source-uri is empty"
 		return res
 	}
 
