@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"github.com/ptk1729/verifier_service/formatting"
 	"github.com/ptk1729/verifier_service/linting"
 	"github.com/ptk1729/verifier_service/report"
+	"github.com/ptk1729/verifier_service/slsa"
 	"github.com/ptk1729/verifier_service/utils"
 	"github.com/ptk1729/verifier_service/vulnscan"
 )
@@ -28,15 +30,19 @@ func main() {
 		reviewsFlag     = flag.Bool("reviews", false, "Run only reviews check")
 		customFlag      = flag.Bool("custom", false, "Run only custom checks")
 		commitFlag      = flag.Bool("commit", false, "Run only commit verification check")
+		slsaFlag        = flag.Bool("slsa", false, "Run only SLSA (Supply chain Levels for Software Artifacts) check")
 		printReportFlag = flag.Bool("print-report", false, "Print the full report to console")
 		requiredReviews = flag.Int("required-reviews", 2, "Number of required reviews")
 		allowedKeys     = flag.String("allowed-keys", "", "Comma-separated list of allowed GPG key IDs for commit verification")
+		binaryPath      = flag.String("binary-path", "", "Path to the binary file for SLSA verification")
+		provenancePath  = flag.String("provenance-path", "", "Path to the provenance file (.intoto.jsonl) for SLSA verification")
+		sourceURI       = flag.String("source-uri", "", "Source URI for SLSA verification (e.g., git+https://github.com/user/repo)")
 	)
 
 	flag.Parse()
 
 	// Check if any individual check flag is set
-	individualCheck := *lintFlag || *formatFlag || *vulnFlag || *envFlag || *reviewsFlag || *customFlag || *commitFlag
+	individualCheck := *lintFlag || *formatFlag || *vulnFlag || *envFlag || *reviewsFlag || *customFlag || *commitFlag || *slsaFlag
 
 	// Get repo URL from positional arguments
 	args := flag.Args()
@@ -48,6 +54,7 @@ func main() {
 		fmt.Println("  go run main.go https://github.com/user/repo")
 		fmt.Println("  go run main.go -lint https://github.com/user/repo")
 		fmt.Println("  go run main.go -vuln https://github.com/user/repo")
+		fmt.Println("  go run main.go -slsa -binary-path=/path/to/binary -provenance-path=/path/to/provenance.intoto.jsonl -source-uri=git+https://github.com/user/repo https://github.com/user/repo")
 		fmt.Println("  go run main.go -commit -allowed-keys=ABC123,DEF456 https://github.com/user/repo")
 		fmt.Println("  go run main.go -print-report https://github.com/user/repo")
 		os.Exit(1)
@@ -75,7 +82,7 @@ func main() {
 
 	if individualCheck {
 		// Run individual check based on flag
-		runIndividualCheck(clonePath, *lintFlag, *formatFlag, *vulnFlag, *envFlag, *reviewsFlag, *customFlag, *commitFlag, *requiredReviews, allowedKeysList)
+		runIndividualCheck(clonePath, *lintFlag, *formatFlag, *vulnFlag, *envFlag, *reviewsFlag, *customFlag, *commitFlag, *slsaFlag, *requiredReviews, allowedKeysList, *binaryPath, *provenancePath, *sourceURI)
 	} else {
 		// Run full report generation
 		verificationReport := report.GenerateReport(
@@ -85,6 +92,9 @@ func main() {
 			verifierVersion,
 			*requiredReviews,
 			allowedKeysList,
+			*binaryPath,
+			*provenancePath,
+			*sourceURI,
 		)
 
 		// -------- SAVE --------
@@ -99,7 +109,7 @@ func main() {
 	}
 }
 
-func runIndividualCheck(clonePath string, lint, format, vuln, env, reviewsFlag, custom, commitFlag bool, requiredReviews int, allowedKeys []string) {
+func runIndividualCheck(clonePath string, lint, format, vuln, env, reviewsFlag, custom, commitFlag, slsaFlag bool, requiredReviews int, allowedKeys []string, binaryPath, provenancePath, sourceURI string) {
 	if lint {
 		fmt.Println("=== LINTING CHECK ===")
 		result := linting.RunLint(clonePath)
@@ -160,5 +170,44 @@ func runIndividualCheck(clonePath string, lint, format, vuln, env, reviewsFlag, 
 		result := commit.VerifyCommits(clonePath, allowedKeys)
 		output, _ := json.MarshalIndent(result, "", "  ")
 		fmt.Println(string(output))
+	}
+
+	if slsaFlag {
+		fmt.Println("=== SLSA CHECK ===")
+
+		// Validate required parameters
+		if binaryPath == "" {
+			fmt.Println("Error: -binary-path is required for SLSA verification")
+			fmt.Println("Example: -binary-path=/path/to/binary")
+			return
+		}
+		if provenancePath == "" {
+			fmt.Println("Error: -provenance-path is required for SLSA verification")
+			fmt.Println("Example: -provenance-path=/path/to/provenance.intoto.jsonl")
+			return
+		}
+		if sourceURI == "" {
+			fmt.Println("Error: -source-uri is required for SLSA verification")
+			fmt.Println("Example: -source-uri=git+https://github.com/user/repo")
+			return
+		}
+
+		fmt.Println("binaryPath: ", binaryPath)
+		fmt.Println("provenancePath: ", provenancePath)
+		fmt.Println("sourceURI: ", sourceURI)
+		result := slsa.RunSlsaCheck(context.Background(), binaryPath, provenancePath, sourceURI)
+
+		fmt.Println("Level:", slsa.CheckSlsaLevel(result))
+
+		output, _ := json.MarshalIndent(result, "", "  ")
+		fmt.Println(string(output))
+		fmt.Printf("SLSA Level: %s\n", slsa.CheckSlsaLevel(result))
+
+		if result.MissingProvenance {
+			fmt.Println("\nRecommendations:")
+			fmt.Println("- Consider implementing SLSA provenance generation in your CI/CD pipeline")
+			fmt.Println("- Use tools like slsa-framework/slsa-github-generator for GitHub Actions")
+			fmt.Println("- Add .intoto.jsonl or provenance.json files to your repository")
+		}
 	}
 }

@@ -90,6 +90,9 @@ func VerifyCommits(repoPath string, allowedKeys []string) types.CommitVerificati
 	if len(allKeys) == 0 {
 		fmt.Println("Warning: No GPG keys available for verification")
 	}
+	// TODO:
+	// - make sure the commits happened while the key was valid
+	// - make sure multiple keys are supported
 
 	cmd := exec.Command("git", "-C", repoPath, "log", "--pretty=format:%H|%ae|%G?", "--show-signature")
 	out, err := cmd.Output()

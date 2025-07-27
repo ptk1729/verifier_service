@@ -1,15 +1,17 @@
-REPO_URL=https://github.com/ptk1729/go_proj
+# REPO_URL=https://github.com/ptk1729/go_proj
+REPO_URL=~/go_proj
 # REPO_URL=https://github.com/caddyserver/caddy
 # REPO_URL=https://github.com/ptk1729/caddy_orig
 
 run:
 	go run main.go $(REPO_URL)
-
+run-all:
+	go run main.go -binary-path=~/go_proj/binary-linux-amd64/binary-linux-amd64 -provenance-path=~/go_proj/binary-linux-amd64.intoto.jsonl/binary-linux-amd64.intoto.jsonl -source-uri=git+https://github.com/ptk1729/go_proj $(REPO_URL)
 build:
 	go build -o verifier main.go
 
 # Individual check targets for testing
-test-lint:
+test-lint:¯
 	go run main.go -lint $(REPO_URL)
 
 test-vuln:

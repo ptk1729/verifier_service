@@ -42,3 +42,9 @@ func GetCommitAuthor(path, commit string) string {
 	out := Run("git", "-C", path, "show", "-s", "--format=%ae", commit)
 	return strings.TrimSpace(out)
 }
+
+// GetLatestCommitMessage gets the latest commit message from the git repository
+func GetLatestCommitMessage(path string) string {
+	out := Run("git", "-C", path, "log", "-1", "--pretty=%B")
+	return strings.TrimSpace(out)
+}

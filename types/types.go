@@ -5,12 +5,14 @@ import (
 )
 
 type Metadata struct {
-	ProjectName     string `json:"project_name"`
-	RepoURL         string `json:"repo_url"`
-	CommitID        string `json:"commit_id"`
-	CheckedAt       string `json:"checked_at"`
-	VerifierVersion string `json:"verifier_version"`
-	RunID           string `json:"run_id"`
+	ProjectName        string       `json:"project_name"`
+	RepoURL            string       `json:"repo_url"`
+	CommitHash         string       `json:"commit_hash"`
+	CommitMessage      string       `json:"commit_message"`
+	CheckedAt          string       `json:"checked_at"`
+	VerifierVersion    string       `json:"verifier_version"`
+	RunID              string       `json:"run_id"`
+	VerificationStatus ResultStatus `json:"verification_status"`
 }
 
 type VulnerabilityCheck struct {
@@ -31,6 +33,18 @@ type CommitVerification struct {
 	CommitsChecked      []CommitCheck `json:"commits_checked"`
 	NoVerifiedCommits   int           `json:"no_verified_commits"`
 	NoUnverifiedCommits int           `json:"no_unverified_commits"`
+}
+
+type SLSACheck struct {
+	Status            ResultStatus `json:"status"`
+	ProvenanceFiles   []string     `json:"provenance_files"`
+	TotalFiles        int          `json:"total_files"`
+	ValidFiles        int          `json:"valid_files"`
+	InvalidFiles      int          `json:"invalid_files"`
+	MissingProvenance bool         `json:"missing_provenance"`
+	SLSALevel         string       `json:"slsa_level"`
+	BuilderID         string       `json:"builder_id,omitempty"`
+	ErrorMessage      string       `json:"error_message,omitempty"`
 }
 
 // ResultStatus is a common type for status results across all packages

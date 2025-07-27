@@ -5,20 +5,32 @@ import (
 	"path/filepath"
 )
 
+// CustomCheck is a custom check that can be run on a repository
 type CustomCheck struct {
 	Name    string        `json:"name"`
 	Status  ResultStatus  `json:"status"`
 	Details []interface{} `json:"details"`
+	Error   string        `json:"error,omitempty"`
 }
 
+// ResultStatus is a common type for status results across all packages
 type ResultStatus string
 
+// ResultStatusFailed is a custom check that failed
 const (
 	ResultStatusFailed  ResultStatus = "FAILED"
 	ResultStatusWarning ResultStatus = "WARNING"
 	ResultStatusPassed  ResultStatus = "PASSED"
 	ResultStatusSkipped ResultStatus = "SKIPPED"
 )
+
+// ResultStatusSkipped is a custom check that was skipped
+
+// ResultStatusPassed is a custom check that passed
+
+// ResultStatusWarning is a custom check that had a warning
+
+// ResultStatusSkipped is a custom check that was skipped
 
 // CheckDockerfile checks if a Dockerfile exists and validates its best practices
 func CheckDockerfile(path string) CustomCheck {

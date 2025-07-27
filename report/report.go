@@ -1,6 +1,7 @@
 package report
 
 import (
+	"context"
 	"time"
 
 	"github.com/ptk1729/verifier_service/commit"
@@ -8,6 +9,7 @@ import (
 	"github.com/ptk1729/verifier_service/envcheck"
 	"github.com/ptk1729/verifier_service/formatting"
 	"github.com/ptk1729/verifier_service/linting"
+	"github.com/ptk1729/verifier_service/slsa"
 	"github.com/ptk1729/verifier_service/types"
 	"github.com/ptk1729/verifier_service/utils"
 	"github.com/ptk1729/verifier_service/vulnscan"
@@ -22,6 +24,8 @@ type Report struct {
 	// ReviewsCheck       reviews.ReviewsResult       `json:"reviews_check"` TODO: removing for now, low priority
 	EnvVariablesCheck envcheck.EnvVariablesResult `json:"env_variables_check"`
 	CustomChecks      []customchecks.CustomCheck  `json:"custom_checks"`
+	// SLSACheck         types.SLSACheck             `json:"slsa_check"`
+	SlsaCheck slsa.SlsaCheckResult `json:"slsa_check"`
 }
 
 // GenerateReport generates a complete verification report for the given repository
@@ -32,9 +36,13 @@ func GenerateReport(
 	verifierVersion string,
 	requiredReviews int,
 	allowedKeys []string,
+	slsaBinaryPath string,
+	slsaProvenancePath string,
+	slsaSourceURI string,
 ) Report {
 	// Get commit information
-	commitID := utils.GetLatestCommit(clonePath)
+	commitHash := utils.GetLatestCommit(clonePath)
+	commitMessage := utils.GetLatestCommitMessage(clonePath)
 	runID := utils.RandomUUID()
 	now := time.Now().UTC().Format(time.RFC3339)
 
@@ -55,14 +63,38 @@ func GenerateReport(
 	envResult := envcheck.ScanEnvFiles(clonePath)
 	customChecks := customchecks.RunAllCustomChecks(clonePath)
 
+	// Run SLSA check
+	slsaResult := slsa.RunSlsaCheck(context.Background(), slsaBinaryPath, slsaProvenancePath, slsaSourceURI)
+
+	var verificationStatus types.ResultStatus = types.ResultStatusPassed
+	// if any check is failed, the verification status is failed
+	// if any check is skipped, the verification status is failed
+	// if all checks are passed, the verification status is passed
+
+	var customStatuses []customchecks.ResultStatus
+	for _, check := range customChecks {
+		customStatuses = append(customStatuses, check.Status)
+	}
+	verificationStatus = overallStatus(
+		lintingResult.Status,
+		formattingResult.Status,
+		vulnStatus,
+		commitVerification.Status,
+		envResult.Status,
+		slsaResult.Status,
+		customStatuses,
+	)
+
 	return Report{
 		MetaData: types.Metadata{
-			ProjectName:     projectName,
-			RepoURL:         repoURL,
-			CommitID:        commitID,
-			CheckedAt:       now,
-			VerifierVersion: verifierVersion,
-			RunID:           runID,
+			ProjectName:        projectName,
+			RepoURL:            repoURL,
+			CommitHash:         commitHash,
+			CommitMessage:      commitMessage,
+			CheckedAt:          now,
+			VerifierVersion:    verifierVersion,
+			RunID:              runID,
+			VerificationStatus: verificationStatus,
 		},
 		Linting:    lintingResult,
 		Formatting: formattingResult,
@@ -75,5 +107,24 @@ func GenerateReport(
 		// ReviewsCheck:       reviewsResult,
 		EnvVariablesCheck: envResult,
 		CustomChecks:      customChecks,
+		SlsaCheck:         slsaResult,
 	}
+}
+
+// extractProvenanceFileNames extracts just the file names from SLSA check results
+func extractProvenanceFileNames(checks []types.SLSACheck) []string {
+	var fileNames []string
+	for _, check := range checks {
+		fileNames = append(fileNames, check.ProvenanceFiles...)
+	}
+	return fileNames
+}
+
+func overallStatus(statuses ...interface{}) types.ResultStatus {
+	for _, status := range statuses {
+		if status == types.ResultStatusFailed || status == customchecks.ResultStatusSkipped {
+			return types.ResultStatusFailed
+		}
+	}
+	return types.ResultStatusPassed
 }
