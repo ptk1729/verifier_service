@@ -230,8 +230,8 @@ func VerifyCommits(repoPath string, allowedKeys []string) types.CommitVerificati
 	}
 
 	return types.CommitVerification{
-		Status: status,
-		// CommitsChecked:      commits, // TODO: add this back in if needed to see all the commits
+		Status:              status,
+		CommitsChecked:      commits, // TODO: add this back in if needed to see all the commits
 		NoVerifiedCommits:   len(commits) - allUnverified,
 		NoUnverifiedCommits: allUnverified,
 	}
