@@ -57,6 +57,9 @@ func main() {
 		fmt.Println("  go run main.go -slsa -binary-path=/path/to/binary -provenance-path=/path/to/provenance.intoto.jsonl -source-uri=git+https://github.com/user/repo https://github.com/user/repo")
 		fmt.Println("  go run main.go -commit -allowed-keys=ABC123,DEF456 https://github.com/user/repo")
 		fmt.Println("  go run main.go -print-report https://github.com/user/repo")
+		fmt.Println("  go run main.go -sign -private-key=private_key.bin https://github.com/user/repo")
+		fmt.Println("  go run main.go -verify -public-key=public_key.bin report_file.json")
+		fmt.Println("  go run main.go -generate-keys")
 		os.Exit(1)
 	}
 
@@ -85,7 +88,7 @@ func main() {
 		runIndividualCheck(clonePath, *lintFlag, *formatFlag, *vulnFlag, *envFlag, *reviewsFlag, *customFlag, *commitFlag, *slsaFlag, *requiredReviews, allowedKeysList, *binaryPath, *provenancePath, *sourceURI)
 	} else {
 		// Run full report generation
-		verificationReport := report.GenerateReport(
+		verificationReport, err := report.GenerateReport(
 			projectName,
 			repoURL,
 			clonePath,
@@ -96,6 +99,10 @@ func main() {
 			*provenancePath,
 			*sourceURI,
 		)
+		if err != nil {
+			fmt.Printf("Error generating report: %v\n", err)
+			os.Exit(1)
+		}
 
 		// -------- SAVE --------
 		reportName := fmt.Sprintf("/tmp/report_%s.json", time.Now().Format("20060102150405"))

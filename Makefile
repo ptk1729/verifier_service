@@ -10,6 +10,12 @@ run-all:
 build:
 	go build -o verifier main.go
 
+generate-keys:
+	go run main.go -generate-keys
+
+run-with-signing:
+	go run main.go -private-key=private_key.bin -binary-path=~/go_proj/binary-linux-amd64/binary-linux-amd64 -provenance-path=~/go_proj/binary-linux-amd64.intoto.jsonl/binary-linux-amd64.intoto.jsonl -source-uri=git+https://github.com/ptk1729/go_proj $(REPO_URL)
+
 # Individual check targets for testing
 test-lint:¯
 	go run main.go -lint $(REPO_URL)

@@ -2,6 +2,10 @@ package report
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/ptk1729/verifier_service/commit"
@@ -15,18 +19,52 @@ import (
 	"github.com/ptk1729/verifier_service/vulnscan"
 )
 
-type Report struct {
-	MetaData           types.Metadata              `json:"metadata"`
+// ReportData contains all the verification results
+type ReportData struct {
 	Linting            linting.LintingResult       `json:"linting"`
 	Formatting         formatting.FormattingResult `json:"formatting"`
 	VulnerabilityCheck types.VulnerabilityCheck    `json:"vulnerability_check"`
 	CommitVerification types.CommitVerification    `json:"commit_verification"`
-	// ReviewsCheck       reviews.ReviewsResult       `json:"reviews_check"` TODO: removing for now, low priority
-	EnvVariablesCheck envcheck.EnvVariablesResult `json:"env_variables_check"`
-	CustomChecks      []customchecks.CustomCheck  `json:"custom_checks"`
-	// SLSACheck         types.SLSACheck             `json:"slsa_check"`
-	SlsaCheck slsa.SlsaCheckResult `json:"slsa_check"`
+	EnvVariablesCheck  envcheck.EnvVariablesResult `json:"env_variables_check"`
+	CustomChecks       []customchecks.CustomCheck  `json:"custom_checks"`
+	SlsaCheck          slsa.SlsaCheckResult        `json:"slsa_check"`
 }
+
+// Report is the main struct for the report with metadata containing SHA256 hash
+type Report struct {
+	Metadata types.MetadataWithHash `json:"metadata"`
+	Data     ReportData             `json:"report"`
+}
+
+// calculateReportHash calculates SHA256 hash of the report data
+
+func calculateReportHash(data ReportData) (string, error) {
+	// Use Marshal (not MarshalIndent) to get compact JSON without formatting
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return "", err
+	}
+
+	// Additional safety: remove any potential whitespace/newlines
+	compactJSON := strings.ReplaceAll(string(jsonData), " ", "")
+	compactJSON = strings.ReplaceAll(compactJSON, "\n", "")
+	compactJSON = strings.ReplaceAll(compactJSON, "\r", "")
+	compactJSON = strings.ReplaceAll(compactJSON, "\t", "")
+
+	hash := sha256.Sum256([]byte(compactJSON))
+	return hex.EncodeToString(hash[:]), nil
+}
+
+// func calculateReportHash(data ReportData) (string, error) {
+// 	// Use MarshalIndent to match the formatting used by jq and SaveJSON
+// 	jsonData, err := json.MarshalIndent(data, "", "  ")
+// 	if err != nil {
+// 		return "", err
+// 	}
+
+// 	hash := sha256.Sum256(jsonData)
+// 	return hex.EncodeToString(hash[:]), nil
+// }
 
 // GenerateReport generates a complete verification report for the given repository
 func GenerateReport(
@@ -39,7 +77,7 @@ func GenerateReport(
 	slsaBinaryPath string,
 	slsaProvenancePath string,
 	slsaSourceURI string,
-) Report {
+) (Report, error) {
 	// Get commit information
 	commitHash := utils.GetLatestCommit(clonePath)
 	commitMessage := utils.GetLatestCommitMessage(clonePath)
@@ -59,7 +97,6 @@ func GenerateReport(
 	// Run commit verification
 	commitVerification := commit.VerifyCommits(clonePath, allowedKeys)
 
-	// reviewsResult := reviews.CheckReviews(requiredReviews)
 	envResult := envcheck.ScanEnvFiles(clonePath)
 	customChecks := customchecks.RunAllCustomChecks(clonePath)
 
@@ -67,9 +104,6 @@ func GenerateReport(
 	slsaResult := slsa.RunSlsaCheck(context.Background(), slsaBinaryPath, slsaProvenancePath, slsaSourceURI)
 
 	var verificationStatus types.ResultStatus = types.ResultStatusPassed
-	// if any check is failed, the verification status is failed
-	// if any check is skipped, the verification status is failed
-	// if all checks are passed, the verification status is passed
 
 	var customStatuses []customchecks.ResultStatus
 	for _, check := range customChecks {
@@ -85,8 +119,30 @@ func GenerateReport(
 		customStatuses,
 	)
 
-	return Report{
-		MetaData: types.Metadata{
+	// Create report data
+	reportData := ReportData{
+		Linting:    lintingResult,
+		Formatting: formattingResult,
+		VulnerabilityCheck: types.VulnerabilityCheck{
+			Status:          vulnStatus,
+			Tool:            vulnTool,
+			Vulnerabilities: vulnerabilities,
+		},
+		CommitVerification: commitVerification,
+		EnvVariablesCheck:  envResult,
+		CustomChecks:       customChecks,
+		SlsaCheck:          slsaResult,
+	}
+
+	// Calculate SHA256 hash of the report data
+	reportHash, err := calculateReportHash(reportData)
+	if err != nil {
+		return Report{}, err
+	}
+
+	// Create metadata with hash
+	metadata := types.MetadataWithHash{
+		Metadata: types.Metadata{
 			ProjectName:        projectName,
 			RepoURL:            repoURL,
 			CommitHash:         commitHash,
@@ -96,19 +152,13 @@ func GenerateReport(
 			RunID:              runID,
 			VerificationStatus: verificationStatus,
 		},
-		Linting:    lintingResult,
-		Formatting: formattingResult,
-		VulnerabilityCheck: types.VulnerabilityCheck{
-			Status:          vulnStatus,
-			Tool:            vulnTool,
-			Vulnerabilities: vulnerabilities,
-		},
-		CommitVerification: commitVerification,
-		// ReviewsCheck:       reviewsResult,
-		EnvVariablesCheck: envResult,
-		CustomChecks:      customChecks,
-		SlsaCheck:         slsaResult,
+		ReportSHA256: reportHash,
 	}
+
+	return Report{
+		Metadata: metadata,
+		Data:     reportData,
+	}, nil
 }
 
 // extractProvenanceFileNames extracts just the file names from SLSA check results

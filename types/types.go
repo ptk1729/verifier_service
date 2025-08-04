@@ -15,6 +15,12 @@ type Metadata struct {
 	VerificationStatus ResultStatus `json:"verification_status"`
 }
 
+// MetadataWithHash extends Metadata with a SHA256 hash of the report
+type MetadataWithHash struct {
+	Metadata
+	ReportSHA256 string `json:"report_sha256"`
+}
+
 type VulnerabilityCheck struct {
 	Status          vulnscan.ResultStatus `json:"status"`
 	Tool            string                `json:"tool"` // osv-scanner, gosec, etc.
