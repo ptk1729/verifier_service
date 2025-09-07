@@ -1,12 +1,18 @@
-# REPO_URL=https://github.com/ptk1729/go_proj
-REPO_URL=~/go_proj
+REPO_URL=https://github.com/ptk1729/go_proj
+# REPO_URL=~/go_proj
 # REPO_URL=https://github.com/caddyserver/caddy
 # REPO_URL=https://github.com/ptk1729/caddy_orig
 
 run:
 	go run main.go $(REPO_URL)
 run-all:
-	go run main.go -binary-path=~/go_proj/binary-linux-amd64/binary-linux-amd64 -provenance-path=~/go_proj/binary-linux-amd64.intoto.jsonl/binary-linux-amd64.intoto.jsonl -source-uri=git+https://github.com/ptk1729/go_proj $(REPO_URL)
+	go run main.go \
+	-binary-path=/home/prateek/go_proj/binary-linux-amd64/binary-linux-amd64 \
+	-provenance-path=/home/prateek/go_proj/binary-linux-amd64.intoto.jsonl/binary-linux-amd64.intoto.jsonl \
+	-source-uri=git+https://github.com/ptk1729/go_proj \
+	-project-name="Go test server" \
+	-report-path=/tmp/test_dir \
+	$(REPO_URL)
 build:
 	go build -o verifier main.go
 
@@ -16,8 +22,11 @@ generate-keys:
 run-with-signing:
 	go run main.go -private-key=private_key.bin -binary-path=~/go_proj/binary-linux-amd64/binary-linux-amd64 -provenance-path=~/go_proj/binary-linux-amd64.intoto.jsonl/binary-linux-amd64.intoto.jsonl -source-uri=git+https://github.com/ptk1729/go_proj $(REPO_URL)
 
+verify-report:
+	./examples/hash_check.sh verify /tmp/report_20250810160512.json
+
 # Individual check targets for testing
-test-lint:¯
+test-lint:
 	go run main.go -lint $(REPO_URL)
 
 test-vuln:

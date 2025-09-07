@@ -5,8 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"regexp"
+	"sort"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/ptk1729/verifier_service/commit"
 	"github.com/ptk1729/verifier_service/customchecks"
@@ -55,8 +59,61 @@ func calculateReportHash(data ReportData) (string, error) {
 	return hex.EncodeToString(hash[:]), nil
 }
 
+func calculateReportHash2(data interface{}) (string, string, error) {
+	// Marshal to generic map
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return "", "", err
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return "", "", err
+	}
+
+	repAny, ok := m["report"]
+	if !ok {
+		return "", "", nil // no report
+	}
+	rep, ok := repAny.(map[string]interface{})
+	if !ok {
+		return "", "", nil
+	}
+
+	// Sort keys
+	keys := make([]string, 0, len(rep))
+	for k := range rep {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	cleaner := regexp.MustCompile(`[\s\r\n\t]+`)
+
+	var sb strings.Builder
+	for _, k := range keys {
+		// key stripped
+		sb.WriteString(cleaner.ReplaceAllString(k, ""))
+
+		// value compact + stripped
+		valBytes, err := json.Marshal(rep[k])
+		if err != nil {
+			return "", "", err
+		}
+		valStr := cleaner.ReplaceAllString(string(valBytes), "")
+		sb.WriteString(valStr)
+	}
+
+	compactReport := sb.String()
+	sum := sha256.Sum256([]byte(compactReport))
+	return compactReport, hex.EncodeToString(sum[:]), nil
+}
+
+// zero-copy convert []byte to string
+func bytesToString(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b)) // if you prefer safe: return string(b)
+}
+
 // func calculateReportHash(data ReportData) (string, error) {
-// 	// Use MarshalIndent to match the formatting used by jq and SaveJSON
+//
 // 	jsonData, err := json.MarshalIndent(data, "", "  ")
 // 	if err != nil {
 // 		return "", err
@@ -94,13 +151,11 @@ func GenerateReport(
 		vulnerabilities = vulnscan.EnrichVulnerabilitiesWithSeverity(vulnerabilities)
 	}
 
-	// Run commit verification
 	commitVerification := commit.VerifyCommits(clonePath, allowedKeys)
 
 	envResult := envcheck.ScanEnvFiles(clonePath)
 	customChecks := customchecks.RunAllCustomChecks(clonePath)
 
-	// Run SLSA check
 	slsaResult := slsa.RunSlsaCheck(context.Background(), slsaBinaryPath, slsaProvenancePath, slsaSourceURI)
 
 	var verificationStatus types.ResultStatus = types.ResultStatusPassed
@@ -119,7 +174,6 @@ func GenerateReport(
 		customStatuses,
 	)
 
-	// Create report data
 	reportData := ReportData{
 		Linting:    lintingResult,
 		Formatting: formattingResult,
@@ -134,13 +188,23 @@ func GenerateReport(
 		SlsaCheck:          slsaResult,
 	}
 
-	// Calculate SHA256 hash of the report data
-	reportHash, err := calculateReportHash(reportData)
+	reportDataJSON, err := json.Marshal(reportData)
 	if err != nil {
 		return Report{}, err
 	}
-
-	// Create metadata with hash
+	reportData = ReportData{}
+	err = json.Unmarshal(reportDataJSON, &reportData)
+	if err != nil {
+		return Report{}, err
+	}
+	r := Report{Data: reportData}
+	_, reportHash2, err := calculateReportHash2(r)
+	// reportString, reportHash2, err := calculateReportHash2(reportData)
+	if err != nil {
+		return Report{}, err
+	}
+	// fmt.Println("reportString: ", reportString)
+	fmt.Printf("Calculated SHA256: %s\n\n", reportHash2)
 	metadata := types.MetadataWithHash{
 		Metadata: types.Metadata{
 			ProjectName:        projectName,
@@ -152,7 +216,8 @@ func GenerateReport(
 			RunID:              runID,
 			VerificationStatus: verificationStatus,
 		},
-		ReportSHA256: reportHash,
+		// ReportString: reportString,
+		ReportSHA256: reportHash2,
 	}
 
 	return Report{

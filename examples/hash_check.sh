@@ -97,10 +97,10 @@ case "$command" in
         echo "Expected hash:   $expected_hash"
         echo "Calculated hash: $calculated_hash"
         if [ "$expected_hash" = "$calculated_hash" ]; then
-            echo "✅ Hash comparison PASSED"
+            echo "Hash comparison PASSED"
             exit 0
         else
-            echo "❌ Hash comparison FAILED"
+            echo "Hash comparison FAILED"
             exit 1
         fi
         ;;

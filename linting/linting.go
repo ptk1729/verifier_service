@@ -27,21 +27,20 @@ func RunLint(path string) LintingResult {
 	// first run go mod tidy and other commands to make sure the code is up to date
 	runCmd(path, "go", "mod", "tidy")
 	errs := runGovet(path)
-	// warns := runGolint(path)
+	warns := runGolint(path)
 
 	status := ResultStatusPassed
 	if len(errs) > 0 {
 		status = ResultStatusFailed
+	} else if len(warns) > 0 {
+		status = ResultStatusWarning
 	}
-	// } else if len(warns) > 0 {
-	// 	status = ResultStatusWarning
-	// }
 
 	return LintingResult{
-		Status: status,
-		Errors: errs,
-		// Warnings: warns,
-		Tool: "go vet",
+		Status:   status,
+		Errors:   errs,
+		Warnings: warns,
+		Tool:     "golangci-lint",
 	}
 }
 
@@ -53,7 +52,7 @@ func runGovet(dir string) []string {
 }
 
 func runGolint(dir string) []string {
-	out, _ := runCmd(dir, "golint", "./...")
+	out, _ := runCmd(dir, "golangci-lint", "run", "./...")
 	return split(out)
 }
 

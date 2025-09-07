@@ -21,7 +21,6 @@ import (
 )
 
 func main() {
-	// Define flags for individual checks
 	var (
 		lintFlag        = flag.Bool("lint", false, "Run only linting check")
 		formatFlag      = flag.Bool("format", false, "Run only formatting check")
@@ -37,14 +36,14 @@ func main() {
 		binaryPath      = flag.String("binary-path", "", "Path to the binary file for SLSA verification")
 		provenancePath  = flag.String("provenance-path", "", "Path to the provenance file (.intoto.jsonl) for SLSA verification")
 		sourceURI       = flag.String("source-uri", "", "Source URI for SLSA verification (e.g., git+https://github.com/user/repo)")
+		projectNameCLI  = flag.String("project-name", "Default Project Name", "Project name for the report")
+		reportPath      = flag.String("report-path", "/tmp", "Path to save the report (without filename)")
 	)
 
 	flag.Parse()
 
-	// Check if any individual check flag is set
 	individualCheck := *lintFlag || *formatFlag || *vulnFlag || *envFlag || *reviewsFlag || *customFlag || *commitFlag || *slsaFlag
 
-	// Get repo URL from positional arguments
 	args := flag.Args()
 	if len(args) < 1 {
 		fmt.Println("Usage: go run main.go [flags] <repo_url>")
@@ -59,16 +58,18 @@ func main() {
 		fmt.Println("  go run main.go -print-report https://github.com/user/repo")
 		fmt.Println("  go run main.go -sign -private-key=private_key.bin https://github.com/user/repo")
 		fmt.Println("  go run main.go -verify -public-key=public_key.bin report_file.json")
-		fmt.Println("  go run main.go -generate-keys")
+		fmt.Println("  go run main.go -report-path=/path/to/save/report https://github.com/user/repo")
 		os.Exit(1)
 	}
 
 	repoURL := args[0]
-	projectName := "go_proj"
+	projectName := *projectNameCLI
+	if projectName == "" {
+		projectName = "Default Project Name"
+	}
 	clonePath := "./repo_clone"
 	verifierVersion := "1.0.0"
 
-	// Parse allowed keys
 	var allowedKeysList []string
 	if *allowedKeys != "" {
 		allowedKeysList = strings.Split(*allowedKeys, ",")
@@ -77,17 +78,14 @@ func main() {
 		}
 	}
 
-	// -------- CLONE --------
 	if _, err := os.Stat(clonePath); !os.IsNotExist(err) {
 		os.RemoveAll(clonePath)
 	}
 	utils.Run("git", "clone", repoURL, clonePath)
 
 	if individualCheck {
-		// Run individual check based on flag
 		runIndividualCheck(clonePath, *lintFlag, *formatFlag, *vulnFlag, *envFlag, *reviewsFlag, *customFlag, *commitFlag, *slsaFlag, *requiredReviews, allowedKeysList, *binaryPath, *provenancePath, *sourceURI)
 	} else {
-		// Run full report generation
 		verificationReport, err := report.GenerateReport(
 			projectName,
 			repoURL,
@@ -104,8 +102,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		// -------- SAVE --------
-		reportName := fmt.Sprintf("/tmp/report_%s.json", time.Now().Format("20060102150405"))
+		reportName := fmt.Sprintf("%s/report_%s.json", *reportPath, time.Now().Format("20060102150405"))
 		utils.SaveJSON(verificationReport, reportName)
 
 		fmt.Printf("Done. Report saved to %s\n", reportName)
