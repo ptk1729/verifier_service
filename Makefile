@@ -11,7 +11,6 @@ run-all:
 	-provenance-path=/home/prateek/go_proj/binary-linux-amd64.intoto.jsonl/binary-linux-amd64.intoto.jsonl \
 	-source-uri=git+https://github.com/ptk1729/go_proj \
 	-project-name="Go test server" \
-	-report-path=/tmp/test_dir \
 	$(REPO_URL)
 build:
 	go build -o verifier main.go

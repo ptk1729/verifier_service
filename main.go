@@ -21,6 +21,7 @@ import (
 )
 
 func main() {
+	now := time.Now().Format("20060102150405")
 	var (
 		lintFlag        = flag.Bool("lint", false, "Run only linting check")
 		formatFlag      = flag.Bool("format", false, "Run only formatting check")
@@ -37,7 +38,7 @@ func main() {
 		provenancePath  = flag.String("provenance-path", "", "Path to the provenance file (.intoto.jsonl) for SLSA verification")
 		sourceURI       = flag.String("source-uri", "", "Source URI for SLSA verification (e.g., git+https://github.com/user/repo)")
 		projectNameCLI  = flag.String("project-name", "Default Project Name", "Project name for the report")
-		reportPath      = flag.String("report-path", "/tmp", "Path to save the report (without filename)")
+		reportPath      = flag.String("report-path", "/tmp/report_"+now+".json", "Path to save the report (with filename included)")
 	)
 
 	flag.Parse()
@@ -102,7 +103,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		reportName := fmt.Sprintf("%s/report_%s.json", *reportPath, time.Now().Format("20060102150405"))
+		reportName := fmt.Sprintf("%s", *reportPath)
 		utils.SaveJSON(verificationReport, reportName)
 
 		fmt.Printf("Done. Report saved to %s\n", reportName)
