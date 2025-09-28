@@ -98,8 +98,8 @@ func VerifyCommits(repoPath string, allowedKeys []string) types.CommitVerificati
 	out, err := cmd.Output()
 	if err != nil {
 		return types.CommitVerification{
-			Status:         types.ResultStatusFailed,
-			CommitsChecked: []types.CommitCheck{},
+			Status: types.ResultStatusFailed,
+			// CommitsChecked: []types.CommitCheck{},
 		}
 	}
 
@@ -230,8 +230,8 @@ func VerifyCommits(repoPath string, allowedKeys []string) types.CommitVerificati
 	}
 
 	return types.CommitVerification{
-		Status:         status,
-		CommitsChecked: commits, // TODO: add this back in if needed to see all the commits
+		Status: status,
+		// CommitsChecked: commits, // TODO: add this back in if needed to see all the commits
 		//  TODO: make sure the keys are verified with the time of the signing and commiting as well
 		NoVerifiedCommits:   len(commits) - allUnverified,
 		NoUnverifiedCommits: allUnverified,

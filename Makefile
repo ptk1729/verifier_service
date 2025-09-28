@@ -2,6 +2,8 @@ REPO_URL=https://github.com/ptk1729/go_proj
 # REPO_URL=~/go_proj
 # REPO_URL=https://github.com/caddyserver/caddy
 # REPO_URL=https://github.com/ptk1729/caddy_orig
+CADDY_REPO_URL=https://github.com/caddyserver/caddy
+KUBE_REPO_URL=https://github.com/kubernetes/kubernetes
 
 run:
 	go run main.go $(REPO_URL)
@@ -12,6 +14,16 @@ run-all:
 	-source-uri=git+https://github.com/ptk1729/go_proj \
 	-project-name="Go test server" \
 	$(REPO_URL)
+
+run-all-caddy:
+	go run main.go \
+	-project-name="Caddy server" \
+	$(CADDY_REPO_URL)
+
+run-all-kube:
+	go run main.go \
+	-project-name="Kube server" \
+	$(KUBE_REPO_URL)
 build:
 	go build -o verifier main.go
 

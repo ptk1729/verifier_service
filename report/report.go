@@ -17,6 +17,7 @@ import (
 	"github.com/ptk1729/verifier_service/envcheck"
 	"github.com/ptk1729/verifier_service/formatting"
 	"github.com/ptk1729/verifier_service/linting"
+	"github.com/ptk1729/verifier_service/manifest"
 	"github.com/ptk1729/verifier_service/slsa"
 	"github.com/ptk1729/verifier_service/types"
 	"github.com/ptk1729/verifier_service/utils"
@@ -32,6 +33,7 @@ type ReportData struct {
 	EnvVariablesCheck  envcheck.EnvVariablesResult `json:"env_variables_check"`
 	CustomChecks       []customchecks.CustomCheck  `json:"custom_checks"`
 	SlsaCheck          slsa.SlsaCheckResult        `json:"slsa_check"`
+	ManifestScan       types.ManifestScanResult    `json:"manifest_scan"`
 }
 
 // Report is the main struct for the report with metadata containing SHA256 hash
@@ -155,6 +157,7 @@ func GenerateReport(
 
 	envResult := envcheck.ScanEnvFiles(clonePath)
 	customChecks := customchecks.RunAllCustomChecks(clonePath)
+	manifestResult := manifest.ScanManifests(clonePath)
 
 	slsaResult := slsa.RunSlsaCheck(context.Background(), slsaBinaryPath, slsaProvenancePath, slsaSourceURI)
 
@@ -171,6 +174,7 @@ func GenerateReport(
 		commitVerification.Status,
 		envResult.Status,
 		slsaResult.Status,
+		manifestResult.Status,
 		customStatuses,
 	)
 
@@ -186,6 +190,7 @@ func GenerateReport(
 		EnvVariablesCheck:  envResult,
 		CustomChecks:       customChecks,
 		SlsaCheck:          slsaResult,
+		ManifestScan:       manifestResult,
 	}
 
 	reportDataJSON, err := json.Marshal(reportData)

@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: random-server
+  labels:
+    app: random-server
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: random-server
+  template:
+    metadata:
+      labels:
+        app: random-server
+    spec:
+      containers:
+      - name: random-server
+        image: nginx:alpine
+        ports:
+        - containerPort: 8080
+        - containerPort: 9090
+        env:
+        - name: ENV_MODE
+          value: "production"
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: api-secret
+              key: api-key
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: random-server-svc
+spec:
+  selector:
+    app: random-server
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+  - name: metrics
+    port: 9091
+    targetPort: 9090
+  type: ClusterIP

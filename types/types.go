@@ -35,12 +35,13 @@ type CommitCheck struct {
 }
 
 type CommitVerification struct {
-	Status              ResultStatus  `json:"status"`
-	CommitsChecked      []CommitCheck `json:"commits_checked"`
-	NoVerifiedCommits   int           `json:"no_verified_commits"`
-	NoUnverifiedCommits int           `json:"no_unverified_commits"`
+	Status ResultStatus `json:"status"`
+	// CommitsChecked      []CommitCheck `json:"commits_checked"`
+	NoVerifiedCommits   int `json:"no_verified_commits"`
+	NoUnverifiedCommits int `json:"no_unverified_commits"`
 }
 
+// SLSACheck represents the result of scanning SLSAs
 type SLSACheck struct {
 	Status            ResultStatus `json:"status"`
 	ProvenanceFiles   []string     `json:"provenance_files"`
@@ -61,3 +62,47 @@ const (
 	ResultStatusWarning ResultStatus = "WARNING"
 	ResultStatusPassed  ResultStatus = "PASSED"
 )
+
+// ManifestScanResult represents the result of scanning manifests
+type ManifestScanResult struct {
+	Status              string                   `json:"status"`
+	Tool                string                   `json:"tool"`
+	Dockerfiles         []DockerfileInfo         `json:"dockerfiles"`
+	KubernetesManifests []KubernetesManifestInfo `json:"kubernetes_manifests"`
+	TotalFiles          int                      `json:"total_files"`
+	FilesWithIssues     int                      `json:"files_with_issues"`
+}
+
+// DockerfileInfo contains information about a Dockerfile
+type DockerfileInfo struct {
+	Path            string       `json:"path"`
+	ExposedPorts    []PortInfo   `json:"exposed_ports"`
+	EnvironmentVars []EnvVarInfo `json:"environment_variables"`
+	HasIssues       bool         `json:"has_issues"`
+	Issues          []string     `json:"issues,omitempty"`
+}
+
+// KubernetesManifestInfo contains information about a Kubernetes manifest
+type KubernetesManifestInfo struct {
+	Path            string       `json:"path"`
+	Kind            string       `json:"kind"`
+	Name            string       `json:"name"`
+	ExposedPorts    []PortInfo   `json:"exposed_ports"`
+	EnvironmentVars []EnvVarInfo `json:"environment_variables"`
+	HasIssues       bool         `json:"has_issues"`
+	Issues          []string     `json:"issues,omitempty"`
+}
+
+// PortInfo represents port information
+type PortInfo struct {
+	Port     int    `json:"port"`
+	Protocol string `json:"protocol"`
+	Type     string `json:"type"` // "exposed", "service", "container"
+}
+
+// EnvVarInfo represents environment variable information
+type EnvVarInfo struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+	Type  string `json:"type"` // "env", "envFrom", "configMap", "secret"
+}
