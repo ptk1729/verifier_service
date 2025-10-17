@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ptk1729/verifier_service/commit"
-	"github.com/ptk1729/verifier_service/customchecks"
 	"github.com/ptk1729/verifier_service/envcheck"
 	"github.com/ptk1729/verifier_service/formatting"
 	"github.com/ptk1729/verifier_service/linting"
@@ -29,7 +28,6 @@ func main() {
 		vulnFlag        = flag.Bool("vuln", false, "Run only vulnerability check")
 		envFlag         = flag.Bool("env", false, "Run only environment variables check")
 		reviewsFlag     = flag.Bool("reviews", false, "Run only reviews check")
-		customFlag      = flag.Bool("custom", false, "Run only custom checks")
 		commitFlag      = flag.Bool("commit", false, "Run only commit verification check")
 		slsaFlag        = flag.Bool("slsa", false, "Run only SLSA (Supply chain Levels for Software Artifacts) check")
 		manifestFlag    = flag.Bool("manifest", false, "Run only manifest scanning check")
@@ -45,7 +43,7 @@ func main() {
 
 	flag.Parse()
 
-	individualCheck := *lintFlag || *formatFlag || *vulnFlag || *envFlag || *reviewsFlag || *customFlag || *commitFlag || *slsaFlag || *manifestFlag
+	individualCheck := *lintFlag || *formatFlag || *vulnFlag || *envFlag || *reviewsFlag || *commitFlag || *slsaFlag || *manifestFlag
 
 	args := flag.Args()
 	if len(args) < 1 {
@@ -87,7 +85,7 @@ func main() {
 	utils.Run("git", "clone", repoURL, clonePath)
 
 	if individualCheck {
-		runIndividualCheck(clonePath, *lintFlag, *formatFlag, *vulnFlag, *envFlag, *reviewsFlag, *customFlag, *commitFlag, *slsaFlag, *manifestFlag, *requiredReviews, allowedKeysList, *binaryPath, *provenancePath, *sourceURI)
+		runIndividualCheck(clonePath, *lintFlag, *formatFlag, *vulnFlag, *envFlag, *reviewsFlag, *commitFlag, *slsaFlag, *manifestFlag, *requiredReviews, allowedKeysList, *binaryPath, *provenancePath, *sourceURI)
 	} else {
 		verificationReport, err := report.GenerateReport(
 			projectName,
@@ -116,7 +114,7 @@ func main() {
 	}
 }
 
-func runIndividualCheck(clonePath string, lint, format, vuln, env, reviewsFlag, custom, commitFlag, slsaFlag, manifestFlag bool, requiredReviews int, allowedKeys []string, binaryPath, provenancePath, sourceURI string) {
+func runIndividualCheck(clonePath string, lint, format, vuln, env, reviewsFlag, commitFlag, slsaFlag, manifestFlag bool, requiredReviews int, allowedKeys []string, binaryPath, provenancePath, sourceURI string) {
 	if lint {
 		fmt.Println("=== LINTING CHECK ===")
 		result := linting.RunLint(clonePath)
@@ -160,13 +158,6 @@ func runIndividualCheck(clonePath string, lint, format, vuln, env, reviewsFlag, 
 	// 	output, _ := json.MarshalIndent(result, "", "  ")
 	// 	fmt.Println(string(output))
 	// }
-
-	if custom {
-		fmt.Println("=== CUSTOM CHECKS ===")
-		checks := customchecks.RunAllCustomChecks(clonePath)
-		output, _ := json.MarshalIndent(checks, "", "  ")
-		fmt.Println(string(output))
-	}
 
 	if commitFlag {
 		fmt.Println("=== COMMIT VERIFICATION CHECK ===")

@@ -7,13 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
 	"unsafe"
 
 	"github.com/ptk1729/verifier_service/commit"
-	"github.com/ptk1729/verifier_service/customchecks"
 	"github.com/ptk1729/verifier_service/envcheck"
 	"github.com/ptk1729/verifier_service/formatting"
 	"github.com/ptk1729/verifier_service/linting"
@@ -31,9 +31,9 @@ type ReportData struct {
 	VulnerabilityCheck types.VulnerabilityCheck    `json:"vulnerability_check"`
 	CommitVerification types.CommitVerification    `json:"commit_verification"`
 	EnvVariablesCheck  envcheck.EnvVariablesResult `json:"env_variables_check"`
-	CustomChecks       []customchecks.CustomCheck  `json:"custom_checks"`
 	SlsaCheck          slsa.SlsaCheckResult        `json:"slsa_check"`
 	ManifestScan       types.ManifestScanResult    `json:"manifest_scan"`
+	Timing             types.TimingResults         `json:"timing"`
 }
 
 // Report is the main struct for the report with metadata containing SHA256 hash
@@ -114,6 +114,27 @@ func bytesToString(b []byte) string {
 	return *(*string)(unsafe.Pointer(&b)) // if you prefer safe: return string(b)
 }
 
+// timeCheck measures the execution time and memory usage of a function
+func timeCheck(checkName string, fn func()) types.TimingInfo {
+	var m1, m2 runtime.MemStats
+	runtime.GC() // Force garbage collection before measurement
+	runtime.ReadMemStats(&m1)
+
+	start := time.Now()
+	fn()
+	duration := time.Since(start)
+
+	runtime.ReadMemStats(&m2)
+
+	return types.TimingInfo{
+		CheckName:    checkName,
+		Duration:     duration.Milliseconds(),         // Convert to milliseconds
+		MemoryBefore: m1.Alloc / 1024,                 // Convert to KB
+		MemoryAfter:  m2.Alloc / 1024,                 // Convert to KB
+		MemoryDelta:  int64(m2.Alloc-m1.Alloc) / 1024, // Convert to KB
+	}
+}
+
 // func calculateReportHash(data ReportData) (string, error) {
 //
 // 	jsonData, err := json.MarshalIndent(data, "", "  ")
@@ -143,30 +164,77 @@ func GenerateReport(
 	runID := utils.RandomUUID()
 	now := time.Now().UTC().Format(time.RFC3339)
 
-	// Run all checks
-	lintingResult := linting.RunLint(clonePath)
-	formattingResult := formatting.RunGofmt(clonePath)
-	vulnStatus, vulnTool, vulnerabilities := vulnscan.RunOsvScanner(clonePath)
+	// Variables to store results
+	var lintingResult linting.LintingResult
+	var formattingResult formatting.FormattingResult
+	var vulnStatus vulnscan.ResultStatus
+	var vulnTool string
+	var vulnerabilities []vulnscan.OsvFinding
+	var commitVerification types.CommitVerification
+	var envResult envcheck.EnvVariablesResult
+	var manifestResult types.ManifestScanResult
+	var slsaResult slsa.SlsaCheckResult
+
+	// Timing measurements
+	var timingResults []types.TimingInfo
+	overallStart := time.Now()
+
+	// Run all checks with timing
+	timingResults = append(timingResults, timeCheck("linting", func() {
+		lintingResult = linting.RunLint(clonePath)
+	}))
+
+	timingResults = append(timingResults, timeCheck("formatting", func() {
+		formattingResult = formatting.RunGofmt(clonePath)
+	}))
+
+	timingResults = append(timingResults, timeCheck("vulnerability_scan", func() {
+		vulnStatus, vulnTool, vulnerabilities = vulnscan.RunOsvScanner(clonePath)
+	}))
 
 	// Enrich vulnerabilities with severity
 	if len(vulnerabilities) > 0 {
-		vulnerabilities = vulnscan.EnrichVulnerabilitiesWithSeverity(vulnerabilities)
+		timingResults = append(timingResults, timeCheck("vulnerability_enrichment", func() {
+			vulnerabilities = vulnscan.EnrichVulnerabilitiesWithSeverity(vulnerabilities)
+		}))
 	}
 
-	commitVerification := commit.VerifyCommits(clonePath, allowedKeys)
+	timingResults = append(timingResults, timeCheck("commit_verification", func() {
+		commitVerification = commit.VerifyCommits(clonePath, allowedKeys)
+	}))
 
-	envResult := envcheck.ScanEnvFiles(clonePath)
-	customChecks := customchecks.RunAllCustomChecks(clonePath)
-	manifestResult := manifest.ScanManifests(clonePath)
+	timingResults = append(timingResults, timeCheck("env_check", func() {
+		envResult = envcheck.ScanEnvFiles(clonePath)
+	}))
 
-	slsaResult := slsa.RunSlsaCheck(context.Background(), slsaBinaryPath, slsaProvenancePath, slsaSourceURI)
+	timingResults = append(timingResults, timeCheck("manifest_scan", func() {
+		manifestResult = manifest.ScanManifests(clonePath)
+	}))
+
+	timingResults = append(timingResults, timeCheck("slsa_check", func() {
+		slsaResult = slsa.RunSlsaCheck(context.Background(), slsaBinaryPath, slsaProvenancePath, slsaSourceURI)
+	}))
+
+	// Calculate total time
+	totalTime := time.Since(overallStart)
+	timingData := types.TimingResults{
+		Results: timingResults,
+		Total:   totalTime.Milliseconds(), // Convert to milliseconds
+	}
+
+	// Print timing results
+	fmt.Println("\n=== TIMING RESULTS ===")
+	for _, timing := range timingResults {
+		fmt.Printf("%-25s: %dms (Memory: %+d KB)\n",
+			timing.CheckName,
+			timing.Duration,
+			timing.MemoryDelta)
+	}
+	fmt.Printf("%-25s: %dms\n", "TOTAL", totalTime.Milliseconds())
+	fmt.Println("=======================\n")
 
 	var verificationStatus types.ResultStatus = types.ResultStatusPassed
 
-	var customStatuses []customchecks.ResultStatus
-	for _, check := range customChecks {
-		customStatuses = append(customStatuses, check.Status)
-	}
 	verificationStatus = overallStatus(
 		lintingResult.Status,
 		formattingResult.Status,
@@ -175,7 +243,6 @@ func GenerateReport(
 		envResult.Status,
 		slsaResult.Status,
 		manifestResult.Status,
-		customStatuses,
 	)
 
 	reportData := ReportData{
@@ -188,9 +255,9 @@ func GenerateReport(
 		},
 		CommitVerification: commitVerification,
 		EnvVariablesCheck:  envResult,
-		CustomChecks:       customChecks,
 		SlsaCheck:          slsaResult,
 		ManifestScan:       manifestResult,
+		Timing:             timingData,
 	}
 
 	reportDataJSON, err := json.Marshal(reportData)
@@ -242,7 +309,7 @@ func extractProvenanceFileNames(checks []types.SLSACheck) []string {
 
 func overallStatus(statuses ...interface{}) types.ResultStatus {
 	for _, status := range statuses {
-		if status == types.ResultStatusFailed || status == customchecks.ResultStatusSkipped {
+		if status == types.ResultStatusFailed {
 			return types.ResultStatusFailed
 		}
 	}

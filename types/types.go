@@ -106,3 +106,18 @@ type EnvVarInfo struct {
 	Value string `json:"value"`
 	Type  string `json:"type"` // "env", "envFrom", "configMap", "secret"
 }
+
+// TimingInfo represents timing information for a specific check
+type TimingInfo struct {
+	CheckName    string `json:"check_name"`
+	Duration     int64  `json:"duration_ms"` // Duration in milliseconds
+	MemoryBefore uint64 `json:"memory_before_kb"`
+	MemoryAfter  uint64 `json:"memory_after_kb"`
+	MemoryDelta  int64  `json:"memory_delta_kb"`
+}
+
+// TimingResults contains all timing information for the verification process
+type TimingResults struct {
+	Results []TimingInfo `json:"timing_results"`
+	Total   int64        `json:"total_duration_ms"` // Total duration in milliseconds
+}

@@ -17,6 +17,9 @@ run-all:
 
 run-all-caddy:
 	go run main.go \
+	-binary-path=/home/prateek/caddy/binary-linux-amd64/binary-linux-amd64 \
+	-provenance-path=/home/prateek/caddy/binary-linux-amd64.intoto.jsonl/binary-linux-amd64.intoto.jsonl \
+	-source-uri=git+https://github.com/ptk1729/caddy \
 	-project-name="Caddy server" \
 	$(CADDY_REPO_URL)
 
