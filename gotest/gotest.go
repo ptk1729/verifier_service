@@ -19,12 +19,27 @@ func RunCoverage(repoPath string) types.TestCoverageResult {
 	var testOut bytes.Buffer
 	testCmd.Stdout = &testOut
 	testCmd.Stderr = &testOut
-	if err := testCmd.Run(); err != nil {
+
+	err := testCmd.Run()
+	testOutput := strings.TrimSpace(testOut.String())
+
+	hasFailures := strings.Contains(testOutput, "FAIL")
+
+	if hasFailures {
 		return types.TestCoverageResult{
 			Status:          types.ResultStatusFailed,
 			CoveragePercent: 0,
 			Tool:            "go test",
-			ErrorMessage:    strings.TrimSpace(testOut.String()),
+			ErrorMessage:    "errors in go test",
+		}
+	}
+
+	if err != nil {
+		return types.TestCoverageResult{
+			Status:          types.ResultStatusFailed,
+			CoveragePercent: 0,
+			Tool:            "go test",
+			ErrorMessage:    "errors in go test",
 		}
 	}
 
@@ -38,7 +53,7 @@ func RunCoverage(repoPath string) types.TestCoverageResult {
 			Status:          types.ResultStatusWarning,
 			CoveragePercent: 0,
 			Tool:            "go tool cover",
-			ErrorMessage:    strings.TrimSpace(coverOut.String()),
+			ErrorMessage:    "errors in go test",
 		}
 	}
 
