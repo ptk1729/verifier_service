@@ -24,7 +24,6 @@ func ScanManifests(repoPath string) types.ManifestScanResult {
 		FilesWithIssues:     0,
 	}
 
-	// Scan for Dockerfiles
 	dockerfiles := findDockerfiles(repoPath)
 	for _, dockerfile := range dockerfiles {
 		dockerfileInfo := scanDockerfile(dockerfile)
@@ -35,7 +34,6 @@ func ScanManifests(repoPath string) types.ManifestScanResult {
 		}
 	}
 
-	// Scan for Kubernetes manifests
 	k8sManifests := findKubernetesManifests(repoPath)
 	for _, manifest := range k8sManifests {
 		manifestInfo := scanKubernetesManifest(manifest)
@@ -46,7 +44,6 @@ func ScanManifests(repoPath string) types.ManifestScanResult {
 		}
 	}
 
-	// Determine overall status
 	if result.FilesWithIssues > 0 {
 		result.Status = string(types.ResultStatusWarning)
 	}
@@ -125,7 +122,6 @@ func scanDockerfile(filePath string) types.DockerfileInfo {
 	scanner := bufio.NewScanner(file)
 	lineNum := 0
 
-	// Regex patterns
 	exposePattern := regexp.MustCompile(`(?i)^\s*EXPOSE\s+(.+)$`)
 	envPattern := regexp.MustCompile(`(?i)^\s*ENV\s+([^=]+)=(.*)$`)
 	envPattern2 := regexp.MustCompile(`(?i)^\s*ENV\s+([^=]+)\s+(.*)$`)
@@ -134,18 +130,15 @@ func scanDockerfile(filePath string) types.DockerfileInfo {
 		lineNum++
 		line := strings.TrimSpace(scanner.Text())
 
-		// Skip comments and empty lines
 		if strings.HasPrefix(line, "#") || line == "" {
 			continue
 		}
 
-		// Check for EXPOSE directive
 		if matches := exposePattern.FindStringSubmatch(line); matches != nil {
 			ports := parseExposedPorts(matches[1])
 			info.ExposedPorts = append(info.ExposedPorts, ports...)
 		}
 
-		// Check for ENV directive (key=value format)
 		if matches := envPattern.FindStringSubmatch(line); matches != nil {
 			info.EnvironmentVars = append(info.EnvironmentVars, types.EnvVarInfo{
 				Name:  strings.TrimSpace(matches[1]),
@@ -154,7 +147,6 @@ func scanDockerfile(filePath string) types.DockerfileInfo {
 			})
 		}
 
-		// Check for ENV directive (key value format)
 		if matches := envPattern2.FindStringSubmatch(line); matches != nil {
 			info.EnvironmentVars = append(info.EnvironmentVars, types.EnvVarInfo{
 				Name:  strings.TrimSpace(matches[1]),
@@ -210,14 +202,12 @@ func scanKubernetesManifest(filePath string) types.KubernetesManifestInfo {
 		}
 	}
 
-	// Check if this is a Kubernetes manifest
 	if !isKubernetesManifest(manifest) {
 		info.HasIssues = true
 		info.Issues = append(info.Issues, "Not a valid Kubernetes manifest")
 		return info
 	}
 
-	// Extract ports and environment variables based on resource type
 	switch info.Kind {
 	case "Service":
 		info.ExposedPorts = extractServicePorts(manifest)
@@ -245,7 +235,6 @@ func parseExposedPorts(portsStr string) []types.PortInfo {
 			continue
 		}
 
-		// Parse port/protocol format (e.g., "8080/tcp", "8080")
 		parts := strings.Split(portStr, "/")
 		port, err := strconv.Atoi(parts[0])
 		if err != nil {
@@ -386,11 +375,9 @@ func extractContainerPorts(manifest map[string]interface{}) []types.PortInfo {
 func extractContainerEnvVars(manifest map[string]interface{}) []types.EnvVarInfo {
 	var envVars []types.EnvVarInfo
 
-	// Handle different workload types
 	containers := extractContainers(manifest)
 
 	for _, container := range containers {
-		// Direct env variables
 		if envList, ok := container["env"].([]interface{}); ok {
 			for _, envInterface := range envList {
 				if envMap, ok := envInterface.(map[string]interface{}); ok {
@@ -409,7 +396,6 @@ func extractContainerEnvVars(manifest map[string]interface{}) []types.EnvVarInfo
 			}
 		}
 
-		// EnvFrom (ConfigMaps and Secrets)
 		if envFromList, ok := container["envFrom"].([]interface{}); ok {
 			for _, envFromInterface := range envFromList {
 				if envFromMap, ok := envFromInterface.(map[string]interface{}); ok {
@@ -443,7 +429,6 @@ func extractContainers(manifest map[string]interface{}) []map[string]interface{}
 	var containers []map[string]interface{}
 
 	if spec, ok := manifest["spec"].(map[string]interface{}); ok {
-		// Handle Pod
 		if containerList, ok := spec["containers"].([]interface{}); ok {
 			for _, containerInterface := range containerList {
 				if container, ok := containerInterface.(map[string]interface{}); ok {
@@ -452,7 +437,6 @@ func extractContainers(manifest map[string]interface{}) []map[string]interface{}
 			}
 		}
 
-		// Handle Deployment, StatefulSet, DaemonSet
 		if template, ok := spec["template"].(map[string]interface{}); ok {
 			if podSpec, ok := template["spec"].(map[string]interface{}); ok {
 				if containerList, ok := podSpec["containers"].([]interface{}); ok {
@@ -465,7 +449,6 @@ func extractContainers(manifest map[string]interface{}) []map[string]interface{}
 			}
 		}
 
-		// Handle Job, CronJob
 		if jobTemplate, ok := spec["jobTemplate"].(map[string]interface{}); ok {
 			if jobSpec, ok := jobTemplate["spec"].(map[string]interface{}); ok {
 				if template, ok := jobSpec["template"].(map[string]interface{}); ok {

@@ -164,7 +164,6 @@ func GenerateReport(
 	runID := utils.RandomUUID()
 	now := time.Now().UTC().Format(time.RFC3339)
 
-	// Variables to store results
 	var lintingResult linting.LintingResult
 	var formattingResult formatting.FormattingResult
 	var vulnStatus vulnscan.ResultStatus
@@ -175,11 +174,9 @@ func GenerateReport(
 	var manifestResult types.ManifestScanResult
 	var slsaResult slsa.SlsaCheckResult
 
-	// Timing measurements
 	var timingResults []types.TimingInfo
 	overallStart := time.Now()
 
-	// Run all checks with timing
 	timingResults = append(timingResults, timeCheck("linting", func() {
 		lintingResult = linting.RunLint(clonePath)
 	}))
@@ -192,7 +189,6 @@ func GenerateReport(
 		vulnStatus, vulnTool, vulnerabilities = vulnscan.RunOsvScanner(clonePath)
 	}))
 
-	// Enrich vulnerabilities with severity
 	if len(vulnerabilities) > 0 {
 		timingResults = append(timingResults, timeCheck("vulnerability_enrichment", func() {
 			vulnerabilities = vulnscan.EnrichVulnerabilitiesWithSeverity(vulnerabilities)
@@ -215,14 +211,12 @@ func GenerateReport(
 		slsaResult = slsa.RunSlsaCheck(context.Background(), slsaBinaryPath, slsaProvenancePath, slsaSourceURI)
 	}))
 
-	// Calculate total time
 	totalTime := time.Since(overallStart)
 	timingData := types.TimingResults{
 		Results: timingResults,
 		Total:   totalTime.Milliseconds(), // Convert to milliseconds
 	}
 
-	// Print timing results
 	fmt.Println("\n=== TIMING RESULTS ===")
 	for _, timing := range timingResults {
 		fmt.Printf("%-25s: %dms (Memory: %+d KB)\n",

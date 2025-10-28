@@ -24,7 +24,6 @@ const (
 // RunLint checks code in the given folder with go vet (errors)
 // and golint (warnings) without changing any file.
 func RunLint(path string) LintingResult {
-	// first run go mod tidy and other commands to make sure the code is up to date
 	runCmd(path, "go", "mod", "tidy")
 	errs := runGovet(path)
 	warns := runGolint(path)
@@ -43,8 +42,6 @@ func RunLint(path string) LintingResult {
 		Tool:     "golangci-lint",
 	}
 }
-
-// ----------------------- helpers -----------------------
 
 func runGovet(dir string) []string {
 	out, _ := runCmd(dir, "go", "vet", "./...")

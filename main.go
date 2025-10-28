@@ -82,7 +82,8 @@ func main() {
 	if _, err := os.Stat(clonePath); !os.IsNotExist(err) {
 		os.RemoveAll(clonePath)
 	}
-	utils.Run("git", "clone", repoURL, clonePath)
+	utils.Run("git", "clone", repoURL, clonePath, "--depth=1")
+	utils.Run("git", "-C", clonePath, "pull", "--unshallow")
 
 	if individualCheck {
 		runIndividualCheck(clonePath, *lintFlag, *formatFlag, *vulnFlag, *envFlag, *reviewsFlag, *commitFlag, *slsaFlag, *manifestFlag, *requiredReviews, allowedKeysList, *binaryPath, *provenancePath, *sourceURI)

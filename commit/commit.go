@@ -23,12 +23,10 @@ func loadGPGKeysFromDataFolder() ([]string, error) {
 	dataFolder := "./data"
 	keys := []string{}
 
-	// Check if data folder exists
 	if _, err := os.Stat(dataFolder); os.IsNotExist(err) {
 		return keys, fmt.Errorf("data folder not found: %s", dataFolder)
 	}
 
-	// Find all .asc files in the data folder
 	files, err := os.ReadDir(dataFolder)
 	if err != nil {
 		return keys, fmt.Errorf("failed to read data folder: %v", err)
@@ -38,14 +36,12 @@ func loadGPGKeysFromDataFolder() ([]string, error) {
 		if !file.IsDir() && strings.HasSuffix(file.Name(), ".asc") {
 			keyPath := filepath.Join(dataFolder, file.Name())
 
-			// Import the GPG key
 			importCmd := exec.Command("gpg", "--import", keyPath)
 			if err := importCmd.Run(); err != nil {
 				fmt.Printf("Warning: Failed to import GPG key %s: %v\n", keyPath, err)
 				continue
 			}
 
-			// Get the key ID from the imported key
 			keyIDCmd := exec.Command("gpg", "--list-keys", "--with-colons")
 			keyIDOut, err := keyIDCmd.Output()
 			if err != nil {
@@ -53,7 +49,6 @@ func loadGPGKeysFromDataFolder() ([]string, error) {
 				continue
 			}
 
-			// Parse the output to get the latest imported key ID
 			lines := strings.Split(string(keyIDOut), "\n")
 			for i := len(lines) - 1; i >= 0; i-- {
 				line := lines[i]
@@ -78,21 +73,16 @@ func loadGPGKeysFromDataFolder() ([]string, error) {
 // VerifyCommits checks all commits in the repo at repoPath, verifies if each commit is signed by any of the allowedKeys.
 // Returns CommitVerification with status PASSED if all are signed by allowed keys, FAILED otherwise.
 func VerifyCommits(repoPath string, allowedKeys []string) types.CommitVerification {
-	// Load GPG keys from data folder
 	dataKeys, err := loadGPGKeysFromDataFolder()
 	if err != nil {
 		fmt.Printf("Warning: Failed to load GPG keys from data folder: %v\n", err)
 	}
 
-	// Combine allowed keys with data folder keys
 	allKeys := append(allowedKeys, dataKeys...)
 
 	if len(allKeys) == 0 {
 		fmt.Println("Warning: No GPG keys available for verification")
 	}
-	// TODO:
-	// - make sure the commits happened while the key was valid
-	// - make sure multiple keys are supported
 
 	cmd := exec.Command("git", "-C", repoPath, "log", "--pretty=format:%H|%ae|%G?", "--show-signature")
 	out, err := cmd.Output()
@@ -155,7 +145,6 @@ func VerifyCommits(repoPath string, allowedKeys []string) types.CommitVerificati
 			stats.BadSignature++
 
 		case "U": // Good signature with unknown validity
-			// Get key ID for this commit
 			showCmd := exec.Command("git", "-C", repoPath, "show", "--format=%GK", "-s", commit)
 			keyOut, _ := showCmd.Output()
 			keyID = strings.TrimSpace(string(keyOut))
@@ -210,7 +199,6 @@ func VerifyCommits(repoPath string, allowedKeys []string) types.CommitVerificati
 		})
 	}
 
-	// Determine overall status
 	allPassed := stats.VerifiedCommits == stats.TotalCommits && stats.TotalCommits > 0
 	var allUnverified int = stats.BadSignature + stats.UnsignedCommits
 	status := types.ResultStatusPassed
@@ -218,7 +206,6 @@ func VerifyCommits(repoPath string, allowedKeys []string) types.CommitVerificati
 		status = types.ResultStatusFailed
 	}
 
-	// Print statistics
 	// if allowedKeys is empty then don't print log
 	if len(allowedKeys) > 0 {
 		fmt.Printf("\n=== Commit Verification Statistics ===\n")
@@ -232,7 +219,6 @@ func VerifyCommits(repoPath string, allowedKeys []string) types.CommitVerificati
 	return types.CommitVerification{
 		Status: status,
 		// CommitsChecked: commits, // TODO: add this back in if needed to see all the commits
-		//  TODO: make sure the keys are verified with the time of the signing and commiting as well
 		NoVerifiedCommits:   len(commits) - allUnverified,
 		NoUnverifiedCommits: allUnverified,
 	}

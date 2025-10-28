@@ -63,7 +63,6 @@ func RunSlsaCheck(ctx context.Context, binaryPath, provenancePath, sourceURI str
 		return res
 	}
 
-	// Gather requirement results for more granular reporting.
 	addReq := func(name string, ok bool) {
 		status := ResultStatusFailed
 		if ok {
@@ -72,7 +71,6 @@ func RunSlsaCheck(ctx context.Context, binaryPath, provenancePath, sourceURI str
 		res.Requirements = append(res.Requirements, RequirementCheck{Name: name, Status: status})
 	}
 
-	// 1. Confirm binary exists ------------------------------------------------
 	if err := fileMustExist(binaryPath); err != nil {
 		res.Status = ResultStatusFailed
 		res.ErrorMessage = fmt.Sprintf("binary not found: %v", err)
@@ -81,7 +79,6 @@ func RunSlsaCheck(ctx context.Context, binaryPath, provenancePath, sourceURI str
 	}
 	addReq("binary_exists", true)
 
-	// 2. Confirm provenance file exists --------------------------------------
 	if err := fileMustExist(provenancePath); err != nil {
 		res.Status = ResultStatusFailed
 		res.MissingProvenance = true
@@ -91,7 +88,6 @@ func RunSlsaCheck(ctx context.Context, binaryPath, provenancePath, sourceURI str
 	}
 	addReq("provenance_exists", true)
 
-	// 3. Compute SHA‑256 digest ---------------------------------------------
 	digest, err := sha256File(binaryPath)
 	if err != nil {
 		res.Status = ResultStatusFailed
@@ -101,7 +97,6 @@ func RunSlsaCheck(ctx context.Context, binaryPath, provenancePath, sourceURI str
 	}
 	addReq("digest_computed", true)
 
-	// 4. Load provenance bytes ----------------------------------------------
 	provenanceBytes, err := os.ReadFile(provenancePath)
 	if err != nil {
 		res.Status = ResultStatusFailed
@@ -111,14 +106,12 @@ func RunSlsaCheck(ctx context.Context, binaryPath, provenancePath, sourceURI str
 	}
 	addReq("provenance_read", true)
 
-	// 5. Prepare verifier options -------------------------------------------
 	provOpts := &options.ProvenanceOpts{
 		ExpectedSourceURI: sourceURI,
 		ExpectedDigest:    digest,
 	}
 	builderOpts := &options.BuilderOpts{}
 
-	// 6. Verify --------------------------------------------------------------
 	_, builderID, err := verifiers.VerifyArtifact(
 		ctx,
 		provenanceBytes,
@@ -134,21 +127,16 @@ func RunSlsaCheck(ctx context.Context, binaryPath, provenancePath, sourceURI str
 	}
 	addReq("signature_and_policy", true)
 
-	// 7. Extract additional details -----------------------------------------
-	// Materials list --------------------------------------------------------
 	res.Materials = extractMaterials(provenanceBytes)
 
-	// Builder ID ------------------------------------------------------------
 	if builderID != nil {
 		if id := builderID.String(); id != "" {
 			res.BuilderID = id
 		}
 	}
 
-	// Source URI requirement outcome (redundant but explicit) --------------
 	addReq("source_uri_match", true)
 
-	// 8. Success -------------------------------------------------------------
 	res.Status = ResultStatusPassed
 	res.SlsaLevel = "Unknown" // TODO: derive when API provides level info or via heuristic.
 	return res
