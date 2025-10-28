@@ -16,6 +16,7 @@ import (
 	"github.com/ptk1729/verifier_service/commit"
 	"github.com/ptk1729/verifier_service/envcheck"
 	"github.com/ptk1729/verifier_service/formatting"
+	"github.com/ptk1729/verifier_service/gotest"
 	"github.com/ptk1729/verifier_service/linting"
 	"github.com/ptk1729/verifier_service/manifest"
 	"github.com/ptk1729/verifier_service/slsa"
@@ -28,6 +29,7 @@ import (
 type ReportData struct {
 	Linting            linting.LintingResult       `json:"linting"`
 	Formatting         formatting.FormattingResult `json:"formatting"`
+	TestCoverage       types.TestCoverageResult    `json:"test_coverage"`
 	VulnerabilityCheck types.VulnerabilityCheck    `json:"vulnerability_check"`
 	CommitVerification types.CommitVerification    `json:"commit_verification"`
 	EnvVariablesCheck  envcheck.EnvVariablesResult `json:"env_variables_check"`
@@ -173,6 +175,7 @@ func GenerateReport(
 	var envResult envcheck.EnvVariablesResult
 	var manifestResult types.ManifestScanResult
 	var slsaResult slsa.SlsaCheckResult
+	var testCoverage types.TestCoverageResult
 
 	var timingResults []types.TimingInfo
 	overallStart := time.Now()
@@ -183,6 +186,11 @@ func GenerateReport(
 
 	timingResults = append(timingResults, timeCheck("formatting", func() {
 		formattingResult = formatting.RunGofmt(clonePath)
+	}))
+
+	// Run go test coverage (best-effort; treat missing tests as WARNING)
+	timingResults = append(timingResults, timeCheck("test_coverage", func() {
+		testCoverage = gotest.RunCoverage(clonePath)
 	}))
 
 	timingResults = append(timingResults, timeCheck("vulnerability_scan", func() {
@@ -232,6 +240,7 @@ func GenerateReport(
 	verificationStatus = overallStatus(
 		lintingResult.Status,
 		formattingResult.Status,
+		testCoverage.Status,
 		vulnStatus,
 		commitVerification.Status,
 		envResult.Status,
@@ -240,8 +249,9 @@ func GenerateReport(
 	)
 
 	reportData := ReportData{
-		Linting:    lintingResult,
-		Formatting: formattingResult,
+		Linting:      lintingResult,
+		Formatting:   formattingResult,
+		TestCoverage: testCoverage,
 		VulnerabilityCheck: types.VulnerabilityCheck{
 			Status:          vulnStatus,
 			Tool:            vulnTool,

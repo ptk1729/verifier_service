@@ -12,6 +12,7 @@ import (
 	"github.com/ptk1729/verifier_service/commit"
 	"github.com/ptk1729/verifier_service/envcheck"
 	"github.com/ptk1729/verifier_service/formatting"
+	"github.com/ptk1729/verifier_service/gotest"
 	"github.com/ptk1729/verifier_service/linting"
 	"github.com/ptk1729/verifier_service/manifest"
 	"github.com/ptk1729/verifier_service/report"
@@ -25,6 +26,7 @@ func main() {
 	var (
 		lintFlag        = flag.Bool("lint", false, "Run only linting check")
 		formatFlag      = flag.Bool("format", false, "Run only formatting check")
+		testFlag        = flag.Bool("tests", false, "Run only tests and report coverage")
 		vulnFlag        = flag.Bool("vuln", false, "Run only vulnerability check")
 		envFlag         = flag.Bool("env", false, "Run only environment variables check")
 		reviewsFlag     = flag.Bool("reviews", false, "Run only reviews check")
@@ -43,7 +45,7 @@ func main() {
 
 	flag.Parse()
 
-	individualCheck := *lintFlag || *formatFlag || *vulnFlag || *envFlag || *reviewsFlag || *commitFlag || *slsaFlag || *manifestFlag
+	individualCheck := *lintFlag || *formatFlag || *testFlag || *vulnFlag || *envFlag || *reviewsFlag || *commitFlag || *slsaFlag || *manifestFlag
 
 	args := flag.Args()
 	if len(args) < 1 {
@@ -53,6 +55,7 @@ func main() {
 		fmt.Println("\nExamples:")
 		fmt.Println("  go run main.go https://github.com/user/repo")
 		fmt.Println("  go run main.go -lint https://github.com/user/repo")
+		fmt.Println("  go run main.go -tests https://github.com/user/repo")
 		fmt.Println("  go run main.go -vuln https://github.com/user/repo")
 		fmt.Println("  go run main.go -slsa -binary-path=/path/to/binary -provenance-path=/path/to/provenance.intoto.jsonl -source-uri=git+https://github.com/user/repo https://github.com/user/repo")
 		fmt.Println("  go run main.go -commit -allowed-keys=ABC123,DEF456 https://github.com/user/repo")
@@ -86,7 +89,7 @@ func main() {
 	utils.Run("git", "-C", clonePath, "pull", "--unshallow")
 
 	if individualCheck {
-		runIndividualCheck(clonePath, *lintFlag, *formatFlag, *vulnFlag, *envFlag, *reviewsFlag, *commitFlag, *slsaFlag, *manifestFlag, *requiredReviews, allowedKeysList, *binaryPath, *provenancePath, *sourceURI)
+		runIndividualCheck(clonePath, *lintFlag, *formatFlag, *testFlag, *vulnFlag, *envFlag, *reviewsFlag, *commitFlag, *slsaFlag, *manifestFlag, *requiredReviews, allowedKeysList, *binaryPath, *provenancePath, *sourceURI)
 	} else {
 		verificationReport, err := report.GenerateReport(
 			projectName,
@@ -115,7 +118,7 @@ func main() {
 	}
 }
 
-func runIndividualCheck(clonePath string, lint, format, vuln, env, reviewsFlag, commitFlag, slsaFlag, manifestFlag bool, requiredReviews int, allowedKeys []string, binaryPath, provenancePath, sourceURI string) {
+func runIndividualCheck(clonePath string, lint, format, tests, vuln, env, reviewsFlag, commitFlag, slsaFlag, manifestFlag bool, requiredReviews int, allowedKeys []string, binaryPath, provenancePath, sourceURI string) {
 	if lint {
 		fmt.Println("=== LINTING CHECK ===")
 		result := linting.RunLint(clonePath)
@@ -127,6 +130,13 @@ func runIndividualCheck(clonePath string, lint, format, vuln, env, reviewsFlag, 
 	if format {
 		fmt.Println("=== FORMATTING CHECK ===")
 		result := formatting.RunGofmt(clonePath)
+		output, _ := json.MarshalIndent(result, "", "  ")
+		fmt.Println(string(output))
+	}
+
+	if tests {
+		fmt.Println("=== GO TEST COVERAGE ===")
+		result := gotest.RunCoverage(clonePath)
 		output, _ := json.MarshalIndent(result, "", "  ")
 		fmt.Println(string(output))
 	}

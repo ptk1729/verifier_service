@@ -121,3 +121,11 @@ type TimingResults struct {
 	Results []TimingInfo `json:"timing_results"`
 	Total   int64        `json:"total_duration_ms"` // Total duration in milliseconds
 }
+
+// TestCoverageResult represents the result of running `go test` with coverage
+type TestCoverageResult struct {
+	Status          ResultStatus `json:"status"`
+	CoveragePercent float64      `json:"coverage_percent"`
+	Tool            string       `json:"tool"`
+	ErrorMessage    string       `json:"error_message,omitempty"`
+}
